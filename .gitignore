@@ -1,0 +1,11 @@
+*.pyc
+*.csv
+*.jpg
+*.png
+*.ckpt
+*.npy
+data
+
+hw3_CNN/food-11
+hw3_CNN/arch
+hw3_CNN/preprocessed
