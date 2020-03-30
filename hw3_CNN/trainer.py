@@ -10,39 +10,24 @@ from ipdb import set_trace as pdb
 
 
 class Trainer:
-    def __init__(self, arch, model, batch_size, lr, train_ds, valid_ds, device):
+    def __init__(self, arch, model, batch_size, lr, device):
         self.arch = arch
         if not os.path.exists(arch):
             os.makedirs(arch)
         self.model = model
         self.batch_size = batch_size
-        self.opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-2)
+        self.opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
         self.scheduler = StepLR(self.opt, step_size=30, gamma=0.5)
         self.criteria = torch.nn.CrossEntropyLoss()
-        self.train_ds = train_ds
-        self.valid_ds = valid_ds
         self.device = device
         self.history = {'train':[], 'valid':[]}
         self.best_score = math.inf
 
-    def run_epoch(self, epoch, training):
+    def run_epoch(self, epoch, dataset, training, desc=''):
         self.model.train(training)
+        shuffle = training
 
-        if training:
-            dataset = self.train_ds
-            shuffle = True
-            desc = '[Train]'
-        else:
-            dataset = self.valid_ds
-            shuffle = False
-            desc = '[Valid]'
-
-        dataloader = DataLoader(
-            dataset=dataset, 
-            batch_size=self.batch_size, 
-            shuffle=shuffle
-        )
-
+        dataloader = DataLoader(dataset, self.batch_size, shuffle=shuffle)
         trange = tqdm(enumerate(dataloader), total=len(dataloader), desc=desc)
         loss = 0
         acc = Accuracy()
@@ -62,6 +47,8 @@ class Trainer:
                 loss=loss / (i+1),
                 acc=acc.print_score() 
             )
+            if i > 50:
+                break
 
         if training:
             self.history['train'].append({'loss': loss / len(trange), 'acc': acc.get_score()})

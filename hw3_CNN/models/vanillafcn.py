@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 
 
-class Classifier(nn.Module):
+class VanillaFCN(nn.Module):
     def __init__(self):
-        super(Classifier, self).__init__()
+        super(VanillaFCN, self).__init__()
 
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # Conv2d output size = floor((W + 2pad - ks) / stride)+1
@@ -35,29 +35,13 @@ class Classifier(nn.Module):
             nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.MaxPool2d(2, 2, 0),          # (512, 4, 4)
-        )
 
-        self.fc = nn.Sequential(
-            nn.Linear(512 * 4 * 4, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Linear(512, 11)
-        )
-
-        self.fconv = nn.Sequential(
             nn.Conv2d(512, 11, 4)           # (11, 1, 1)
         )
 
+
     def forward(self, x):               # (b, 3, 128, 128)
-        out = self.cnn(x)               # (b, 512, 4, 4)
-        
-        # Linear
-        out = out.view(x.shape[0], -1)  # (b, 512*4*4)
-        out = self.fc(out)              # (b, 11)
-        
-        # # FCN
-        # out = self.fconv(out)           # (b, 11, 1, 1)
-        # out = out.view(x.shape[0], -1)    # (b, 11)
+        out = self.cnn(x)               # (b, 11, 1, 1)
+        out = out.view(x.shape[0], -1)  # (b, 11)
         
         return out

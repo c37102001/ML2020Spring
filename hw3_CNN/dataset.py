@@ -21,3 +21,4 @@ class ImgDataset(Dataset):
         Y = torch.LongTensor(Y)
         
         return X, Y
+    
