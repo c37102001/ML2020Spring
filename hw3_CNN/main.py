@@ -15,6 +15,8 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 from models import *
 import torch.backends.cudnn as cudnn
+from collections import Counter
+
 
 torch.manual_seed(42)
 torch.backends.cudnn.deterministic = True
@@ -27,15 +29,41 @@ parser.add_argument('--do_train', action='store_true')
 parser.add_argument('--do_predict', action='store_true')
 parser.add_argument('--do_plot', action='store_true')
 parser.add_argument('--do_all', action='store_true')
+parser.add_argument('--analysis', action='store_true')
 parser.add_argument('--resume', action='store_true')
-parser.add_argument('--max_epoch', type=int, default=50)
-parser.add_argument('--lr', type=float, default=1e-3)
-parser.add_argument('--batch_size', type=int, default=2)
+parser.add_argument('--max_epoch', type=int, default=10)
+parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--batch_size', type=int, default=32)
+parser.add_argument('--accum_steps', type=int, default=1)
 parser.add_argument('--cuda', type=int, default=0)
 args = parser.parse_args()
 
 arch = f'arch/{args.arch}'
 img_size = 128
+
+train_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.RandomApply([
+        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
+        transforms.RandomAffine(45),
+        transforms.ColorJitter(brightness=0.3),
+        transforms.ColorJitter(contrast=0.3),
+        transforms.ColorJitter(saturation=0.3),
+        transforms.ColorJitter(hue=0.2),
+        transforms.RandomGrayscale(p=0.1),
+    ]),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(15),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.343, 0.451, 0.555], std=[0.239, 0.240, 0.230])
+])
+
+test_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.343, 0.451, 0.555], std=[0.239, 0.240, 0.230])
+])
 
 def readfile(path, label=False, cnt_mean_std=False):  # path = 'food-11/training'
     img_dir = os.listdir(path)
@@ -53,6 +81,7 @@ def readfile(path, label=False, cnt_mean_std=False):  # path = 'food-11/training
         std = x.reshape(len(img_dir), -1, 3).std(1).mean(0) / 255
         print('Mean: ', mean)
         print('Std: ', std)
+        print('Total:', len(img_dir))
 
     if label:
         return x, y
@@ -65,44 +94,21 @@ def build_model():
     # model = VanillaCNN()
     # model = VanillaFCN()
     # model = VGG('VGG16')
-    # model = ResNet18()
-    model = ResNet101()
+    model = ResNet18()
+    # model = ResNet50()
     # model = PreActResNet18()
     # model = GoogLeNet()
     # model = DenseNet121()
     # model = ResNeXt29_2x64d()
     # model = MobileNet()
     # model = MobileNetV2()
-    # model = DPN92()
+    # model = DPN26()
     # model = ShuffleNetG2()
     # model = SENet18()
     # model = ShuffleNetV2(1)
     # model = EfficientNetB0()
     
     return model
-
-train_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.RandomApply([
-        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
-        transforms.RandomAffine(45),
-        transforms.ColorJitter(brightness=0.5),
-        transforms.ColorJitter(contrast=0.5),
-        transforms.ColorJitter(saturation=0.5),
-        transforms.ColorJitter(hue=0.3),
-        transforms.RandomGrayscale(p=0.1),
-    ]),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(15),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.343, 0.451, 0.555], std=[0.239, 0.240, 0.230])
-])
-
-test_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.343, 0.451, 0.555], std=[0.239, 0.240, 0.230])
-])
 
 if args.do_preprocess:
     train_x, train_y = readfile('food-11/training', True, True)         # (9866, 128, 128, 3), (9866,)
@@ -156,13 +162,17 @@ if args.do_train or args.do_all:
 
     model = build_model()
     device = torch.device(f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu')
-    
+    if args.resume:
+        model.load_state_dict(torch.load(f'{arch}/model.ckpt'))
     model = model.to(device)
     if not device == 'cpu':
         cudnn.benchmark = True
     
-    trainer = Trainer(arch, model, args.batch_size, args.lr, device)
-
+    trainer = Trainer(arch, model, args.batch_size, args.lr, args.accum_steps, device)
+    if args.resume:
+        with open(f'{arch}/history.json', 'r') as f:
+            trainer.history = json.load(f)
+    
     print('[*] Start training...')
     for epoch in range(args.max_epoch):
         print('Epoch: {}'.format(epoch))
@@ -170,10 +180,10 @@ if args.do_train or args.do_all:
         trainer.run_epoch(epoch, valid_dataset, training=False, desc='[Valid]')
     
     print('[*] Training with full dataset')
-    for epoch in range(30):
+    for epoch in range(10):
         print('Epoch: {}'.format(epoch))
         trainer.run_epoch(epoch, train_val_dataset, training=True, desc='[Total]')
-        trainer.save_best()
+        trainer.save_best(model_name='full_model')
 
 
 if args.do_predict or args.do_all:
@@ -186,7 +196,7 @@ if args.do_predict or args.do_all:
     with open('preprocessed/test_x.pkl', 'rb') as f:
         test_x = pickle.load(f)
     test_dataset = ImgDataset(test_x, transform=test_transform)
-    test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model = build_model()
     device = torch.device(f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu')
@@ -237,3 +247,23 @@ if args.do_plot or args.do_all:
     plt.grid(True)
     plt.savefig(f'{arch}/Acc.png')
     print('Best acc', max([[l['acc'], idx + 1] for idx, l in enumerate(history['valid'])]))
+
+
+if args.analysis:
+    with open('preprocessed/train_y.pkl', 'rb') as f:
+        train_y = pickle.load(f)
+    with open('preprocessed/valid_y.pkl', 'rb') as f:
+        valid_y = pickle.load(f)
+    with open('preprocessed/train_val_y.pkl', 'rb') as f:
+        total_y = pickle.load(f)
+    
+    for (y, name) in [(train_y, 'train'), (valid_y, 'valid'), (total_y, 'total')]:
+        c = Counter(y)
+        keys = sorted(c.keys())
+        counts = [c[k] for k in keys]
+        print(name, counts)
+
+        plt.bar(keys, counts)
+        plt.xticks(keys)
+        plt.savefig(f'analysis/{name}_label_analysis.png')
+        plt.clf()

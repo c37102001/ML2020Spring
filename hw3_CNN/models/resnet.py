@@ -95,11 +95,11 @@ class ResNet(nn.Module):
         out = self.layer4(out)                      # (b, 512, 16, 16)
         out = F.avg_pool2d(out, 4)                  # (b, 512, 4, 4)        (b, 2048, 4, 4)
         
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
+        # out = out.view(out.size(0), -1)
+        # out = self.linear(out)
         
-        # out = self.fcn(out)                         # (b, 11, 1, 1)
-        # out = out.view(x.shape[0], -1)               # (b, 11)
+        out = self.fcn(out)                         # (b, 11, 1, 1)
+        out = out.view(x.shape[0], -1)               # (b, 11)
         
         return out
 

@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from ipdb import set_trace as pdb
 
 
 class Bottleneck(nn.Module):
@@ -48,7 +49,9 @@ class DPN(nn.Module):
         self.layer2 = self._make_layer(in_planes[1], out_planes[1], num_blocks[1], dense_depth[1], stride=2)
         self.layer3 = self._make_layer(in_planes[2], out_planes[2], num_blocks[2], dense_depth[2], stride=2)
         self.layer4 = self._make_layer(in_planes[3], out_planes[3], num_blocks[3], dense_depth[3], stride=2)
-        self.linear = nn.Linear(out_planes[3]+(num_blocks[3]+1)*dense_depth[3], 10)
+        self.linear = nn.Linear((out_planes[3]+(num_blocks[3]+1)*dense_depth[3]) * 16, 11)
+
+        self.fcn = nn.Conv2d(out_planes[3]+(num_blocks[3]+1)*dense_depth[3], 11, 4)
 
     def _make_layer(self, in_planes, out_planes, num_blocks, dense_depth, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -58,15 +61,20 @@ class DPN(nn.Module):
             self.last_planes = out_planes + (i+2) * dense_depth
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+    def forward(self, x):                       # (b, 3, 128, 128)
+        out = F.relu(self.bn1(self.conv1(x)))   # (b, 64, 128, 128)
+        out = self.layer1(out)                  # (b, 304, 128, 128)
+        out = self.layer2(out)                  # (b, 608, 64, 64)
+        out = self.layer3(out)                  # (b, 1096, 32, 32)
+        out = self.layer4(out)                  # (b, 2432, 16, 16)
+        out = F.avg_pool2d(out, 4)              # (b, 2432, 4, 4)
+        
         out = out.view(out.size(0), -1)
         out = self.linear(out)
+        
+        # out = self.fcn(out)                     # (b, 11, 1, 1)
+        # out = out.view(out.size(0), -1)         # (b, 11)
+
         return out
 
 
