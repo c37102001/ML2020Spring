@@ -30,6 +30,7 @@ parser.add_argument('--do_predict', action='store_true')
 parser.add_argument('--do_plot', action='store_true')
 parser.add_argument('--do_all', action='store_true')
 parser.add_argument('--analysis', action='store_true')
+parser.add_argument('--heat_map', action='store_true')
 parser.add_argument('--resume', action='store_true')
 parser.add_argument('--max_epoch', type=int, default=10)
 parser.add_argument('--lr', type=float, default=1e-4)
@@ -187,12 +188,6 @@ if args.do_train or args.do_all:
 
 
 if args.do_predict or args.do_all:
-    test_transform = transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.343, 0.451, 0.555], std=[0.239, 0.240, 0.230])
-    ])
-
     with open('preprocessed/test_x.pkl', 'rb') as f:
         test_x = pickle.load(f)
     test_dataset = ImgDataset(test_x, transform=test_transform)
@@ -267,3 +262,53 @@ if args.analysis:
         plt.xticks(keys)
         plt.savefig(f'analysis/{name}_label_analysis.png')
         plt.clf()
+
+
+if args.heat_map:
+    with open('preprocessed/train_x.pkl', 'rb') as f:
+        datas = pickle.load(f)
+    with open('preprocessed/train_y.pkl', 'rb') as f:
+        labels = pickle.load(f)
+    dataset = ImgDataset(datas, transform=test_transform)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+
+    model = build_model()
+    device = torch.device(f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu')
+    if not device == 'cpu':
+        cudnn.benchmark = True
+    model.load_state_dict(torch.load(f'{arch}/model.ckpt'))
+    model.to(device)
+    model.train(False)
+
+    trange = tqdm(dataloader, total=len(dataloader), desc='[Predict]')
+    prediction = []
+    for x, _ in trange:                        # (b, 3, 128, 128)
+        x = x.to(device)
+        o_labels = model(x)                 # (b, 11)
+        o_labels = o_labels.argmax(dim=1)   # (b,)
+        o_labels = o_labels.cpu().numpy().tolist()
+        prediction.extend(o_labels)
+
+    import seaborn as sns
+    from sklearn.metrics import confusion_matrix 
+    C2 = confusion_matrix(prediction, labels.tolist(), labels=[i for i in range(11)])
+    
+    plt.figure(figsize=(10, 10))
+    ax = sns.heatmap(
+        C2,
+        xticklabels=[i for i in range(11)],
+        yticklabels=[i for i in range(11)],
+        center=0, vmax=200,
+        cmap=sns.diverging_palette(20, 220, n=20),
+        square=True,
+        annot=True
+    )
+    ax.set_xticklabels(
+        ax.get_xticklabels(),
+        rotation=45,
+        horizontalalignment='right'
+    )
+    bottom, top = ax.get_ylim()
+    ax.set_ylim(bottom + 0.5, top - 0.5)
+
+    plt.savefig('analysis/heat_map') 

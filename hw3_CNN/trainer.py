@@ -31,12 +31,30 @@ class Trainer:
         self.model.train(training)
         shuffle = training
 
-        dataloader = DataLoader(dataset, self.batch_size, shuffle=shuffle)
+        # ===== weighted random sampler ======
+        class_sample_counts = [994, 429, 1500, 986, 848, 1325, 440, 280, 855, 1500, 709]
+        samples_weights = 1. / torch.tensor(class_sample_counts, dtype=torch.float)
+        total_weights = []
+        for i in range(len(class_sample_counts)):
+            for j in range(class_sample_counts[i]):
+                total_weights.append(samples_weights[i])
+        total_weights = torch.tensor(total_weights)         # shape:(9866)
+        sampler = WeightedRandomSampler(
+            weights=total_weights,
+            num_samples=len(dataset),
+            replacement=True
+        )
+        if training:
+            dataloader = DataLoader(dataset, self.batch_size, sampler=sampler)
+        else:
+            dataloader = DataLoader(dataset, self.batch_size, shuffle=shuffle)
+        # ====================================
+
+        # dataloader = DataLoader(dataset, self.batch_size, shuffle=shuffle)
         trange = tqdm(enumerate(dataloader), total=len(dataloader), desc=desc)
         loss = 0
         acc = Accuracy()
         for i, (imgs, labels) in trange:        # (b, 3, 128, 128), (b, 1)
-            pdb()
             labels = labels.view(-1)            # (b,)
             o_labels, batch_loss = self.run_iters(imgs, labels)
             
