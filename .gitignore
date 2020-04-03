@@ -5,8 +5,13 @@
 *.ckpt
 *.npy
 data
+arch
+*.zip
+*.bin
+__pycache__
 
 hw3_CNN/food-11
 hw3_CNN/arch
 hw3_CNN/preprocessed
 hw9_unsupervised/checkpoints
+hw12_transferLearning/real_or_drawing
