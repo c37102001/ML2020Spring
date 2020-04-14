@@ -19,7 +19,7 @@ class Trainer:
         self.model = model
         self.batch_size = batch_size
         self.opt = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=1e-2)
-        self.scheduler = StepLR(self.opt, step_size=5, gamma=0.5)
+        self.scheduler = StepLR(self.opt, step_size=20, gamma=0.5)
         self.accum_steps = accum_steps
         self.criteria = torch.nn.CrossEntropyLoss()
         self.device = device

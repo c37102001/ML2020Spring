@@ -32,10 +32,10 @@ parser.add_argument('--do_all', action='store_true')
 parser.add_argument('--analysis', action='store_true')
 parser.add_argument('--heat_map', action='store_true')
 parser.add_argument('--resume', action='store_true')
-parser.add_argument('--max_epoch', type=int, default=10)
+parser.add_argument('--max_epoch', type=int, default=80)
 parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--batch_size', type=int, default=32)
-parser.add_argument('--accum_steps', type=int, default=1)
+parser.add_argument('--accum_steps', type=int, default=4)
 parser.add_argument('--cuda', type=int, default=0)
 args = parser.parse_args()
 
@@ -44,19 +44,19 @@ img_size = 128
 
 train_transform = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.RandomApply([
-        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
-        transforms.RandomAffine(45),
-        transforms.ColorJitter(brightness=0.3),
-        transforms.ColorJitter(contrast=0.3),
-        transforms.ColorJitter(saturation=0.3),
-        transforms.ColorJitter(hue=0.2),
-        transforms.RandomGrayscale(p=0.1),
-    ]),
+    transforms.RandomApply([transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0))]),
+    transforms.RandomApply([transforms.RandomAffine(25)]),
+    transforms.RandomApply([transforms.ColorJitter(brightness=0.2)]),
+    transforms.RandomApply([transforms.ColorJitter(contrast=0.2)]),
+    transforms.RandomApply([transforms.ColorJitter(saturation=0.2)]),
+    transforms.RandomApply([transforms.ColorJitter(hue=0.1)]),
+    # transforms.RandomApply([transforms.RandomGrayscale(p=0.1)]),
+
     transforms.RandomVerticalFlip(),
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(15),
     transforms.ToTensor(),
+    # transforms.RandomApply([transforms.Lambda(lambda x : x + torch.randn_like(x))]),
     transforms.Normalize(mean=[0.343, 0.451, 0.555], std=[0.239, 0.240, 0.230])
 ])
 
@@ -141,21 +141,86 @@ if args.do_preprocess:
         pickle.dump(train_val_y, f)
 
 
-if args.do_train or args.do_all:
-    print('[*] Loading pickles...')
-    with open('preprocessed/train_x.pkl', 'rb') as f:
-        train_x = pickle.load(f)
-    with open('preprocessed/train_y.pkl', 'rb') as f:
-        train_y = pickle.load(f)
-    with open('preprocessed/valid_x.pkl', 'rb') as f:
-        valid_x = pickle.load(f)
-    with open('preprocessed/valid_y.pkl', 'rb') as f:
-        valid_y = pickle.load(f)
-    with open('preprocessed/train_val_x.pkl', 'rb') as f:
-        train_val_x = pickle.load(f)
-    with open('preprocessed/train_val_y.pkl', 'rb') as f:
-        train_val_y = pickle.load(f)
+    # print('[*] Loading pickles...')
+    # with open('preprocessed/train_x.pkl', 'rb') as f:
+    #     train_x = pickle.load(f)
+    # with open('preprocessed/train_y.pkl', 'rb') as f:
+    #     train_y = pickle.load(f)
+    # with open('preprocessed/valid_x.pkl', 'rb') as f:
+    #     valid_x = pickle.load(f)
+    # with open('preprocessed/valid_y.pkl', 'rb') as f:
+    #     valid_y = pickle.load(f)
+    # with open('preprocessed/train_val_x.pkl', 'rb') as f:
+    #     train_val_x = pickle.load(f)
+    # with open('preprocessed/train_val_y.pkl', 'rb') as f:
+    #     train_val_y = pickle.load(f)
+    # # SMOTE
+    # from imblearn.over_sampling import SMOTE
+    # smote = SMOTE(random_state=43, n_jobs=12)
+    # dataset_type = 'smote_'
     
+    # print('[*] Doing train SMOTE up-sampling...')
+    # train_x, train_y = smote.fit_sample(train_x.reshape(train_x.shape[0],-1), train_y)
+    # train_x = train_x.reshape(train_x.shape[0], 128, 128, 3)
+    # print('[*] Saving train dataset...')
+    # with open(f'preprocessed/{dataset_type}train_x.pkl', 'wb') as f:
+    #     pickle.dump(train_x, f)
+    # with open(f'preprocessed/{dataset_type}train_y.pkl', 'wb') as f:
+    #     pickle.dump(train_y, f)
+    
+    # print('[*] Doing train-valid SMOTE up-sampling...')
+    # valid_x, valid_y = smote.fit_sample(valid_x.reshape(valid_x.shape[0],-1), valid_y)
+    # valid_x = valid_x.reshape(valid_x.shape[0], 128, 128, 3)
+    # train_val_x = np.concatenate((train_x, valid_x), axis=0)
+    # train_val_y = np.concatenate((train_y, valid_y), axis=0)
+    # print('[*] Saving train-valid dataset...')
+    # with open(f'preprocessed/{dataset_type}train_val_x.pkl', 'wb') as f:
+    #     pickle.dump(train_val_x, f)
+    # with open(f'preprocessed/{dataset_type}train_val_y.pkl', 'wb') as f:
+    #     pickle.dump(train_val_y, f)
+
+
+    # # Oversampling
+    # from imblearn.over_sampling import RandomOverSampler
+    # ros = RandomOverSampler(random_state=43)
+    # dataset_type = 'ros_'
+    
+    # print('[*] Doing train ROS up-sampling...')
+    # train_x, train_y = ros.fit_sample(train_x.reshape(train_x.shape[0],-1), train_y)
+    # train_x = train_x.reshape(train_x.shape[0], 128, 128, 3)
+    # print('[*] Saving train dataset...')
+    # with open(f'preprocessed/{dataset_type}train_x.pkl', 'wb') as f:
+    #     pickle.dump(train_x, f)
+    # with open(f'preprocessed/{dataset_type}train_y.pkl', 'wb') as f:
+    #     pickle.dump(train_y, f)
+    
+    # print('[*] Doing train-valid ROS up-sampling...')
+    # valid_x, valid_y = ros.fit_sample(valid_x.reshape(valid_x.shape[0],-1), valid_y)
+    # valid_x = valid_x.reshape(valid_x.shape[0], 128, 128, 3)
+    # train_val_x = np.concatenate((train_x, valid_x), axis=0)
+    # train_val_y = np.concatenate((train_y, valid_y), axis=0)
+    # print('[*] Saving train-valid dataset...')
+    # with open(f'preprocessed/{dataset_type}train_val_x.pkl', 'wb') as f:
+    #     pickle.dump(train_val_x, f)
+    # with open(f'preprocessed/{dataset_type}train_val_y.pkl', 'wb') as f:
+    #     pickle.dump(train_val_y, f)
+
+if args.do_train or args.do_all:
+    dataset_type = 'smote_'
+
+    print('[*] Loading pickles...')
+    with open(f'preprocessed/{dataset_type}train_x.pkl', 'rb') as f:
+        train_x = pickle.load(f)
+    with open(f'preprocessed/{dataset_type}train_y.pkl', 'rb') as f:
+        train_y = pickle.load(f)
+    with open(f'preprocessed/valid_x.pkl', 'rb') as f:
+        valid_x = pickle.load(f)
+    with open(f'preprocessed/valid_y.pkl', 'rb') as f:
+        valid_y = pickle.load(f)
+    with open(f'preprocessed/{dataset_type}train_val_x.pkl', 'rb') as f:
+        train_val_x = pickle.load(f)
+    with open(f'preprocessed/{dataset_type}train_val_y.pkl', 'rb') as f:
+        train_val_y = pickle.load(f)
 
     train_dataset = ImgDataset(train_x, train_y, transform=train_transform)
     valid_dataset = ImgDataset(valid_x, valid_y, transform=test_transform)
@@ -181,7 +246,7 @@ if args.do_train or args.do_all:
         trainer.run_epoch(epoch, valid_dataset, training=False, desc='[Valid]')
     
     print('[*] Training with full dataset')
-    for epoch in range(10):
+    for epoch in range(60):
         print('Epoch: {}'.format(epoch))
         trainer.run_epoch(epoch, train_val_dataset, training=True, desc='[Total]')
         trainer.save_best(model_name='full_model')
@@ -265,9 +330,9 @@ if args.analysis:
 
 
 if args.heat_map:
-    with open('preprocessed/train_x.pkl', 'rb') as f:
+    with open('preprocessed/valid_x.pkl', 'rb') as f:
         datas = pickle.load(f)
-    with open('preprocessed/train_y.pkl', 'rb') as f:
+    with open('preprocessed/valid_y.pkl', 'rb') as f:
         labels = pickle.load(f)
     dataset = ImgDataset(datas, transform=test_transform)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
@@ -291,7 +356,7 @@ if args.heat_map:
 
     import seaborn as sns
     from sklearn.metrics import confusion_matrix 
-    C2 = confusion_matrix(prediction, labels.tolist(), labels=[i for i in range(11)])
+    C2 = confusion_matrix(labels.tolist(), prediction, labels=[i for i in range(11)])
     
     plt.figure(figsize=(10, 10))
     ax = sns.heatmap(
@@ -311,4 +376,6 @@ if args.heat_map:
     bottom, top = ax.get_ylim()
     ax.set_ylim(bottom + 0.5, top - 0.5)
 
-    plt.savefig('analysis/heat_map') 
+    plt.xlabel('Predicted')
+    plt.ylabel('Expected')
+    plt.savefig(f'{arch}/heat_map') 

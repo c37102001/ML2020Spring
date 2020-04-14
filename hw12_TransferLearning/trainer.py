@@ -101,3 +101,67 @@ class Trainer:
 
 
 
+class FineTuneTrainer:
+    def __init__(self, arch, device):
+        self.arch = arch
+        if not os.path.exists(f'{arch}/ckpts'):
+            os.makedirs(f'{arch}/ckpts')
+
+        self.feature_extractor = FeatureExtractor().to(device)
+        self.label_predictor = LabelPredictor().to(device)
+        self.optimizer_F = optim.Adam(self.feature_extractor.parameters(), lr=1e-4)
+        self.optimizer_C = optim.Adam(self.label_predictor.parameters(), lr=1e-4)
+        self.class_criterion = nn.CrossEntropyLoss()
+        
+        self.device = device
+        self.history = {'loss':[], 'acc':[]}
+        self.best_score = math.inf
+        same_seeds(73)
+
+    def run_epoch(self, epoch, dataloader):
+        self.feature_extractor.train(True)
+        self.label_predictor.train(True)
+
+        trange = tqdm(dataloader, total=len(dataloader), desc=f'[epoch {epoch}]')
+        
+        total_loss = 0
+        acc = Accuracy()
+        for i, (target_data, target_label) in enumerate(trange):    # (b,1,32,32)
+            target_data = target_data.to(self.device)
+            target_label = target_label.view(-1).to(self.device)    # (b)
+            
+            feature = self.feature_extractor(target_data)           # (b, 512)
+            class_logits = self.label_predictor(feature)            # (b, 10)
+            
+            loss = self.class_criterion(class_logits, target_label)
+            total_loss += loss.item()
+            loss.backward()
+            self.optimizer_F.step()
+            self.optimizer_C.step()
+
+            self.optimizer_F.zero_grad()
+            self.optimizer_C.zero_grad()
+
+            acc.update(class_logits, target_label)
+
+            trange.set_postfix(
+                loss=total_loss / (i+1),
+                acc=acc.print_score() 
+            )
+
+        self.history['loss'].append(total_loss / len(trange))
+        self.history['acc'].append(acc.get_score())
+        self.save_hist()
+
+        self.save_model()
+        
+
+    def save_model(self):
+        torch.save(self.feature_extractor.state_dict(), f'{self.arch}/ckpts/finetune-extractor.ckpt')
+        torch.save(self.label_predictor.state_dict(), f'{self.arch}/ckpts/finetune-predictor.ckpt')
+
+    def save_hist(self):
+        with open(f'{self.arch}/finetune-history.json', 'w') as f:
+            json.dump(self.history, f, indent=4)
+
+

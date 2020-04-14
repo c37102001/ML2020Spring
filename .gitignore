@@ -9,9 +9,10 @@ arch
 *.zip
 *.bin
 __pycache__
+*.pkl
 
 hw3_CNN/food-11
 hw3_CNN/arch
 hw3_CNN/preprocessed
-hw9_unsupervised/checkpoints
-hw12_transferLearning/real_or_drawing
+hw9_Unsupervised/checkpoints
+hw12_TransferLearning/real_or_drawing

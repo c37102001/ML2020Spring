@@ -36,7 +36,8 @@ class FeatureExtractor(nn.Module):
         )
         
     def forward(self, x):
-        x = self.conv(x).squeeze()          # (b, 512)
+        x = self.conv(x)                    # (b, 512)
+        x = x.view(x.size(0), -1)
         return x
 
 

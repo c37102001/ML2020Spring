@@ -17,7 +17,9 @@
 
 # Reference
 
-How to deal with imbalanced dataset: WeightedRandomSampler
+How to Handle Imbalanced Classes in Machine Learning
+https://elitedatascience.com/imbalanced-classes
+https://www.kaggle.com/rafjaa/resampling-strategies-for-imbalanced-datasets
 https://discuss.pytorch.org/t/how-to-prevent-overfitting/1902/5
 
 OpenCV、Skimage、PIL圖像處理的細節差異

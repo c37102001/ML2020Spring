@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import StepLR
 import os
 import json
 from tqdm import tqdm
-
+from ipdb import set_trace as pdb
 
 class Trainer:
     def __init__(self, arch, model, lr=1e-5, batch_size=64):
@@ -32,7 +32,7 @@ class Trainer:
 
         trange = tqdm(img_dataloader, total=len(img_dataloader))
         total_loss = 0
-        for i, data in enumerate(trange):
+        for i, (data, _) in enumerate(trange):
             img = data.to(self.device)
 
             encoded, output = self.model(img)
